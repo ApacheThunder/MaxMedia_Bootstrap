@@ -55,8 +55,20 @@ DTCM_DATA bool slot1Available = false;
 DTCM_DATA bool slot2Available = false;
 DTCM_DATA bool usingSlot2 = false;
 
-DTCM_DATA ALIGN(16) const char* AutoBootPathSlot1 = "fat:/bootme.nds";
-DTCM_DATA ALIGN(16) const char* AutoBootPathSlot2 = "slot2:/bootme.nds";
+DTCM_DATA int PathCount = 2;
+
+DTCM_DATA ALIGN(16) const char* DSiAutoBootPath = "fat:/_picoboot.nds";
+
+DTCM_DATA ALIGN(16) const char* AutoBootSlot1Paths[] = {
+	"fat:/bootme.nds",
+	"fat:/boot.nds"
+};
+
+DTCM_DATA ALIGN(16) const char* AutoBootSlot2Paths[] = {
+	"slot2:/bootme.nds",
+	"slot2:/boot.nds"
+};
+
 
 
 u16 Read_S98NOR_ID() {
@@ -286,13 +298,28 @@ int main(void) {
 			}
 		} break;
 		case 0: {
-			const char* bootPath;
+			const char* bootPath = 0;
+			
 			if (slot1Available) {
-				bootPath = AutoBootPathSlot1;
-			} else {
-				bootPath = AutoBootPathSlot2;
+				if (isDSiMode()) {
+					if (access(DSiAutoBootPath, F_OK) == 0)bootPath = DSiAutoBootPath;
+				} else {
+					for (int i = 0; i < PathCount; i++) {
+						if (access(AutoBootSlot1Paths[i], F_OK) == 0) {
+							bootPath = AutoBootSlot1Paths[i];
+							break;
+						}
+					}
+				}
+			} else if (!isDSiMode()) {
+				for (int i = 0; i < PathCount; i++) {
+					if (access(AutoBootSlot2Paths[i], F_OK) == 0) {
+						bootPath = AutoBootSlot2Paths[i];
+						break;
+					}
+				}
 			}
-			if(access(bootPath, F_OK) == 0) {
+			if(bootPath != 0) {
 				const char *argarray[1] = { bootPath };
 				err = runNdsFile(bootPath, 1, argarray);
 				return exitProgram();
